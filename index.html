@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>生词本 · 闪卡学习</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--accent2:#818cf8;--success:#34d399;--warn:#fbbf24;--danger:#f87171;--border:#334155;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+.container{max-width:900px;margin:0 auto;padding:20px}
+header{display:flex;justify-content:space-between;align-items:center;padding:20px 0;border-bottom:1px solid var(--border);margin-bottom:24px;flex-wrap:wrap;gap:12px}
+header h1{font-size:1.5rem;font-weight:700;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav{display:flex;gap:8px;flex-wrap:wrap}
+.btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:.9rem;transition:all .2s;background:var(--card);color:var(--text);border:1px solid var(--border)}
+.btn:hover{border-color:var(--accent);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;font-weight:600}
+.btn.primary:hover{opacity:.9}
+.btn.danger{background:var(--danger);color:#fff;border:none}
+.btn.small{padding:4px 10px;font-size:.8rem}
+.section{display:none}
+.section.active{display:block;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.card{background:var(--card);border-radius:12px;padding:20px;border:1px solid var(--border);margin-bottom:16px}
+.card h2{font-size:1.1rem;margin-bottom:12px;color:var(--accent)}
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all .2s}
+.upload-zone:hover{border-color:var(--accent);background:rgba(56,189,248,.05)}
+.upload-zone.dragover{border-color:var(--accent);background:rgba(56,189,248,.1)}
+.upload-zone input[type=file]{display:none}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.stat-box{background:var(--card);border-radius:10px;padding:16px;text-align:center;border:1px solid var(--border)}
+.stat-box .num{font-size:1.8rem;font-weight:700;color:var(--accent)}
+.stat-box .label{font-size:.8rem;color:var(--muted);margin-top:4px}
+.word-list{max-height:400px;overflow-y:auto}
+.word-item{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,.03);margin-bottom:6px;cursor:pointer;transition:all .2s;border:1px solid transparent}
+.word-item:hover{background:rgba(255,255,255,.06);border-color:var(--border)}
+.word-item .w{font-weight:600;font-size:1rem}
+.word-item .freq{font-size:.75rem;color:var(--muted);background:rgba(255,255,255,.05);padding:2px 8px;border-radius:12px}
+.word-item .diff{display:flex;gap:4px}
+.badge{font-size:.65rem;padding:2px 8px;border-radius:12px;font-weight:600}
+.badge.easy{background:rgba(52,211,153,.15);color:var(--success)}
+.badge.medium{background:rgba(251,191,36,.15);color:var(--warn)}
+.badge.hard{background:rgba(248,113,113,.15);color:var(--danger)}
+.flashcard-container{perspective:1000px;max-width:500px;margin:0 auto;height:340px;position:relative}
+.flashcard{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.4,0,.2,1);cursor:pointer}
+.flashcard.flipped{transform:rotateY(180deg)}
+.flashcard-face{position:absolute;width:100%;height:100%;backface-visibility:hidden;border-radius:16px;border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:var(--card)}
+.flashcard-back{transform:rotateY(180deg)}
+.flashcard .word{font-size:2rem;font-weight:700;margin-bottom:8px}
+.flashcard .phonetic{color:var(--muted);font-size:1rem;margin-bottom:16px;font-family:Georgia,serif}
+.flashcard .meaning{font-size:1.1rem;color:var(--text);margin-bottom:12px;text-align:center;line-height:1.5}
+.flashcard .example{font-size:.9rem;color:var(--muted);font-style:italic;text-align:center;margin-bottom:16px;padding:0 12px}
+.flashcard .image{width:120px;height:80px;border-radius:8px;object-fit:cover;margin-bottom:12px;opacity:.9}
+.flashcard-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;justify-content:center}
+.card-nav{display:flex;justify-content:center;align-items:center;gap:16px;margin-top:20px}
+.progress-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:16px 0}
+.progress-bar .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s ease}
+.filter-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.filter-bar .btn.active{background:var(--accent);color:#fff}
+.review-due{color:var(--warn);font-size:.85rem}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:600px){.settings-grid{grid-template-columns:1fr}}
+.setting-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.setting-item label{font-size:.9rem}
+input[type=number],select{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:.9rem;width:100px}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state svg{width:64px;height:64px;margin-bottom:16px;opacity:.4}
+.tag{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.75rem;background:rgba(56,189,248,.1);color:var(--accent);margin-right:4px}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);padding:12px 20px;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.3);transform:translateY(100px);opacity:0;transition:all .3s ease;z-index:1000}
+.toast.show{transform:translateY(0);opacity:1}
+.loading{display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:999;padding:20px}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border-radius:16px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;border:1px solid var(--border)}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.modal-body{padding:20px}
+.close-btn{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer}
+.sentence-item{padding:10px 0;border-bottom:1px solid var(--border);font-size:.9rem}
+.sentence-item .highlight{color:var(--accent);font-weight:600}
+
+/* ====== 搜索框 ====== */
+.search-box{display:flex;gap:8px;margin-bottom:12px}
+.search-box input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;font-size:.9rem}
+.search-box input:focus{outline:none;border-color:var(--accent)}
+
+/* ====== 批量操作 ====== */
+.batch-toolbar{display:none;align-items:center;gap:8px;margin-bottom:12px;padding:10px 14px;background:rgba(56,189,248,.08);border-radius:8px;border:1px solid rgba(56,189,248,.2)}
+.batch-toolbar.show{display:flex}
+.batch-toolbar .btn{font-size:.8rem;padding:4px 10px}
+
+/* ====== 单词选择 ====== */
+.word-item{position:relative;padding-left:40px}
+.word-item .chk{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:18px;height:18px;cursor:pointer;accent-color:var(--accent)}
+
+/* ====== 详情弹窗增强 ====== */
+.detail-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0;font-size:.85rem;color:var(--muted)}
+.detail-meta .item{background:rgba(255,255,255,.03);padding:10px;border-radius:8px}
+.detail-meta .item .val{color:var(--text);font-weight:600;margin-top:4px;font-size:1rem}
+.timeline{padding:12px 0;border-left:2px solid var(--border);margin-left:8px}
+.timeline-item{padding:8px 0 8px 16px;position:relative;font-size:.85rem;color:var(--muted)}
+.timeline-item::before{content:"";position:absolute;left:-5px;top:14px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.timeline-item .time{font-size:.75rem;color:var(--muted)}
+.study-log-item{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:.85rem}
+
+/* ====== 记忆曲线图表 ====== */
+.memory-chart{display:flex;align-items:flex-end;gap:4px;height:120px;padding:16px;background:rgba(255,255,255,.03);border-radius:8px;margin:12px 0}
+.memory-chart .bar{flex:1;background:linear-gradient(to top,var(--accent),var(--accent2));border-radius:4px 4px 0 0;min-height:4px;transition:height .3s ease}
+.memory-chart .bar-label{font-size:.65rem;text-align:center;color:var(--muted);margin-top:4px}
+
+/* ====== 来源标签 ====== */
+.source-tag{display:inline-block;padding:1px 6px;border-radius:6px;font-size:.7rem;background:rgba(129,140,248,.15);color:var(--accent2);margin-left:4px}
+
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>📚 生词本</h1>
+<div class="nav">
+<button class="btn primary" onclick="app.showSection('upload')">上传PDF</button>
+<button class="btn" onclick="app.showSection('words')">单词库</button>
+<button class="btn" onclick="app.showSection('study')">学习</button>
+<button class="btn" onclick="app.showSection('review')">复习</button>
+<button class="btn" onclick="app.showSection('settings')">设置</button>
+</div>
+</header>
+
+<!-- 上传 -->
+<div id="sec-upload" class="section active">
+<div class="card">
+<h2>📄 上传PDF提取生词</h2>
+<div style="text-align:center;margin-bottom:12px"><button class="btn primary" onclick="app.loadPrebuilt()">📚 加载ACSΜ预置词库</button></div><div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+<input type="file" id="fileInput" accept=".pdf" onchange="app.handleFile(event)">
+<div>📁 点击或拖拽PDF文件到此处</div>
+<div style="color:var(--muted);font-size:.85rem;margin-top:8px">自动提取高频词并过滤常用词</div>
+</div>
+<div id="parseStatus" style="margin-top:12px;display:none">
+<span class="loading"></span> <span id="parseText">正在解析...</span>
+</div>
+</div>
+<div class="stats" id="uploadStats"></div>
+</div>
+
+<!-- 单词库 -->
+<div id="sec-words" class="section">
+<div class="stats" id="wordStats"></div>
+<div class="card">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+<h2>单词列表</h2>
+<div class="filter-bar">
+<button class="btn small active" onclick="app.filterWords('all')">全部</button>
+<button class="btn small" onclick="app.filterWords('new')">未学</button>
+<button class="btn small" onclick="app.filterWords('learning')">学习中</button>
+<button class="btn small" onclick="app.filterWords('mastered')">已掌握</button>
+</div>
+</div>
+<!-- 搜索框 -->
+<div class="search-box">
+<input type="text" id="wordSearch" placeholder="搜索单词..." oninput="app.searchWords(this.value)">
+<button class="btn small" onclick="app.clearSearch()">清除</button>
+</div>
+<!-- 批量操作栏 -->
+<div class="batch-toolbar" id="batchToolbar">
+<span id="batchCount">已选 0 个</span>
+<button class="btn danger small" onclick="app.batchDelete()">删除</button>
+<button class="btn small" onclick="app.batchMarkMastered()">标为已掌握</button>
+<button class="btn small" onclick="app.batchMarkLearning()">标为学习中</button>
+<button class="btn small" onclick="app.clearSelection()">取消选择</button>
+</div>
+<div class="word-list" id="wordList"></div>
+</div>
+</div>
+
+<!-- 学习 -->
+<div id="sec-study" class="section">
+<div class="card">
+<h2>🎯 今日新词学习</h2>
+<div class="progress-bar"><div class="fill" id="studyProgress" style="width:0%"></div></div>
+<div id="studyEmpty" class="empty-state">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+<div>今日新词学习任务已完成，或尚未上传PDF</div>
+</div>
+<div id="studyCardArea" style="display:none">
+<div class="flashcard-container">
+<div class="flashcard" id="flashcard" onclick="app.flipCard()">
+<div class="flashcard-face flashcard-front">
+<img class="image" id="cardImg" src="" alt="" style="display:none">
+<div class="word" id="cardWord"></div>
+<div class="phonetic" id="cardPhonetic"></div>
+<button class="btn small" onclick="event.stopPropagation();app.speak()">🔊 发音</button>
+<div style="color:var(--muted);font-size:.8rem;margin-top:12px">点击翻转查看释义</div>
+</div>
+<div class="flashcard-face flashcard-back">
+<div class="word" id="cardWordBack"></div>
+<div class="meaning" id="cardMeaning"></div>
+<div class="example" id="cardExample"></div>
+<div style="font-size:.8rem;color:var(--muted)">难度: <span id="cardDiff"></span></div>
+</div>
+</div>
+</div>
+<div class="card-nav">
+<button class="btn" onclick="app.prevCard()">← 上一个</button>
+<span id="cardCounter" style="color:var(--muted);font-size:.9rem"></span>
+<button class="btn" onclick="app.nextCard()">下一个 →</button>
+</div>
+<div class="flashcard-actions">
+<button class="btn danger small" onclick="app.markCard('hard')">😰 太难</button>
+<button class="btn small" onclick="app.markCard('again')">🔄 再学一次</button>
+<button class="btn primary small" onclick="app.markCard('good')">✅ 记住了</button>
+<button class="btn small" style="background:var(--success);color:#fff" onclick="app.markCard('easy')">🌟 太简单</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- 复习 -->
+<div id="sec-review" class="section">
+<div class="card">
+<h2>🔄 间隔复习</h2>
+<div id="reviewEmpty" class="empty-state">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+<div>今日没有待复习的单词</div>
+</div>
+<div id="reviewArea" style="display:none">
+<div class="flashcard-container">
+<div class="flashcard" id="reviewCard" onclick="app.flipReviewCard()">
+<div class="flashcard-face flashcard-front">
+<img class="image" id="reviewImg" src="" alt="" style="display:none">
+<div class="word" id="reviewWord"></div>
+<button class="btn small" onclick="event.stopPropagation();app.speakReview()">🔊 发音</button>
+<div style="color:var(--muted);font-size:.8rem;margin-top:12px">点击翻转</div>
+</div>
+<div class="flashcard-face flashcard-back">
+<div class="word" id="reviewWordBack"></div>
+<div class="meaning" id="reviewMeaning"></div>
+<div class="example" id="reviewExample"></div>
+<div class="review-due" id="reviewDue"></div>
+</div>
+</div>
+</div>
+<div class="card-nav">
+<button class="btn" onclick="app.prevReview()">←</button>
+<span id="reviewCounter"></span>
+<button class="btn" onclick="app.nextReview()">→</button>
+</div>
+<div class="flashcard-actions">
+<button class="btn danger small" onclick="app.rateReview('again')">❌ 忘记</button>
+<button class="btn small" onclick="app.rateReview('hard')">😰 困难</button>
+<button class="btn primary small" onclick="app.rateReview('good')">✅ 记得</button>
+<button class="btn small" style="background:var(--success);color:#fff" onclick="app.rateReview('easy')">🌟 简单</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- 设置 -->
+<div id="sec-settings" class="section">
+<div class="card">
+<h2>⚙️ 学习设置</h2>
+<div class="settings-grid">
+<div class="setting-item">
+<label>每日新词数量</label>
+<input type="number" id="dailyNew" value="10" min="1" max="50" onchange="app.saveSettings()">
+</div>
+<div class="setting-item">
+<label>每日复习上限</label>
+<input type="number" id="dailyReview" value="30" min="1" max="100" onchange="app.saveSettings()">
+</div>
+<div class="setting-item">
+<label>自动播放发音</label>
+<select id="autoSpeak" onchange="app.saveSettings()">
+<option value="off">关闭</option>
+<option value="front">正面</option>
+<option value="back">背面</option>
+<option value="both">全部</option>
+</select>
+</div>
+<div class="setting-item">
+<label>图片显示</label>
+<select id="showImage" onchange="app.saveSettings()">
+<option value="on">开启</option>
+<option value="off">关闭</option>
+</select>
+</div>
+<div class="setting-item">
+<label>翻译引擎</label>
+<select id="translateEngine" onchange="app.saveSettings()">
+<option value="libre">LibreTranslate（推荐）</option>
+<option value="mymemory">MyMemory（备用）</option>
+</select>
+</div>
+</div>
+<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+<button class="btn danger" onclick="app.clearAll()">🗑️ 清空所有数据</button>
+<button class="btn" onclick="app.exportData()">📤 导出词库</button>
+<button class="btn" onclick="document.getElementById('importFile').click()">📥 导入词库</button>
+<input type="file" id="importFile" style="display:none" accept=".json" onchange="app.importData(event)">
+</div>
+</div>
+<div class="card">
+<h2>📊 学习统计</h2>
+<div class="stats" id="learningStats"></div>
+</div>
+<div class="card" id="studyLogCard" style="display:none">
+<h2>📅 学习日志</h2>
+<div id="studyLogList"></div>
+</div>
+</div>
+</div>
+
+<!-- 例句弹窗 -->
+<div class="modal-overlay" id="wordDetailModal">
+<div class="modal">
+<div class="modal-header">
+<h3 id="detailTitle">单词详情</h3>
+<button class="close-btn" onclick="document.getElementById('wordDetailModal').classList.remove('show')">×</button>
+</div>
+<div class="modal-body" id="detailBody"></div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="prebuilt.js"></script>
+<script>
+
+
+// ============== 停用词 ==============
+const STOP_WORDS = new Set([
+"the","a","an","and","or","but","in","on","at","to","for","of","with","by","from","as","is","was","are","were","be","been","being","have","has","had","do","does","did","will","would","could","should","may","might","must","shall","can","need","dare","ought","used","get","got","go","went","come","came","take","took","make","made","see","saw","know","knew","think","thought","say","said","tell","told","ask","give","gave","find","found","want","wanted","use","used","work","worked","feel","felt","try","tried","leave","left","call","called","good","new","first","last","long","great","little","own","other","old","right","big","high","different","small","large","next","early","young","important","few","public","bad","same","able","all","each","every","both","either","neither","one","two","three","four","five","six","seven","eight","nine","ten","this","that","these","those","i","you","he","she","it","we","they","me","him","her","us","them","my","your","his","its","our","their","mine","yours","hers","ours","theirs","myself","yourself","himself","herself","itself","ourselves","yourselves","themselves","what","which","who","whom","whose","whatever","whichever","whoever","whomever","that","whether","if","than","then","so","very","too","just","now","only","also","back","after","before","up","down","out","off","over","under","again","further","here","there","when","where","why","how","once","more","most","some","any","no","nor","not","only","own","same","than","too","very","just","don","didn","wasn","weren","haven","hasn","hadn","won","wouldn","couldn","shouldn","isn","aren","ain","let","s","t","ll","ve","re","d","m","o","c","e","g","p","r","u","v","w","x","y","z","fig","figure","table","et","al","eg","ie","etc","vs","vol","no","pp","page","pages","doi","http","https","www","com","org","edu","gov"
+]);
+
+// ============== 缩写黑名单 ==============
+const ABBREVS = new Set(["rt","rtx","ctrl","rm","rmx","rom","fitt","vp","amstar","cca","qoe","pubmed","ovid","ebscohost","1rm","wk","yr","nd","nc","by","ccby","acsm","mss","doi","vol","pp","fig","et","al","vs","med","lww","bj","de","ma","br","jc","ja","sm","ag","mr","dl","md","kw","phd","md","dr","jr","sr","prof","mr","mrs","ms","jw"]);
+
+// ============== 学术词汇表（AWL子集）==============
+const AWL = new Set(["analysis","approach","area","assessment","assume","authority","available","benefit","concept","consistent","constitutional","context","contract","create","data","definition","derived","distribution","economic","environment","established","estimate","evidence","export","factors","financial","formula","function","identified","income","indicate","individual","interpretation","involved","issue","labour","legal","legislation","major","method","occur","percent","period","policy","principle","procedure","process","required","research","response","role","section","sector","significant","similar","source","specific","structure","theory","variable","adaptation","prescription","hypertrophy","isometric","isotonic","isokinetic","eccentric","concentric","periodization","sarcopenia","frailty","metabolite","biomarker","hemodynamic","neuromuscular","musculoskeletal","endocrine","homeostasis","inflammation","cytokine","hormone","insulin","glucose","lipid","cholesterol","adipose","catabolic","anabolic","proteolysis","phosphorylation","kinase","receptor","signaling","transcription","translation","expression","genotype","phenotype","polymorphism","heritability","variance","covariance","correlation","regression","coefficient","residual","heterogeneity","homogeneity","randomization","allocation","blinding","placebo","washout","crossover","longitudinal","prospective","retrospective","observational","cohort","prevalence","incidence","morbidity","mortality","hazard","interval","significance","parameter","precision","validity","reliability","reproducibility","generalizability","confounding","mediation","moderation","interaction","endpoint","diagnosis","prognosis","etiology","pathogenesis","pathophysiology","cascade","feedback","network","construct","dimension","domain","magnitude","intensity","dosage","exposure","duration","timing","sequence","review","systematic","resistance","exercise","supplemental","performance","physical","program","medicine"]);
+const IRREGULAR = {children:"child",people:"person",men:"man",women:"woman",teeth:"tooth",feet:"foot",mice:"mouse",geese:"goose",improves:"improve",enhanced:"enhance",increased:"increase",decreased:"decrease",provided:"provide",showed:"show",compared:"compare",reported:"report",completed:"complete",performed:"perform",prescribed:"prescribe",manipulated:"manipulate",examined:"examine",included:"include",excluded:"exclude",determined:"determine",required:"require",involved:"involve",changed:"change",measured:"measure",assessed:"assess",calculated:"calculate",yielded:"yield",impacted:"impact",affected:"affect",produced:"produce",reduced:"reduce",improved:"improve",based:"base",using:"use",training:"train",running:"run",walking:"walk",talking:"talk",working:"work",learning:"learn",studying:"study",trying:"try",applying:"apply",carrying:"carry",moving:"move",living:"live",giving:"give",driving:"drive",writing:"write",making:"make",taking:"take",coming:"come",going:"go",doing:"do",saying:"say",getting:"get",putting:"put",letting:"let",setting:"set",sitting:"sit",standing:"stand",lying:"lie",dying:"die",traine:"train",trained:"train",analysed:"analyse",analyzing:"analyse",analyzes:"analyse"};
+const INLINE_DICT={abdominal:"腹部的",absolute:"绝对的",abstract:"抽象的",academic:"学术的",academy:"学院",accept:"接受",access:"访问",accident:"事故",accommodation:"住宿",accompany:"陪同",accomplish:"完成",accordance:"一致",according:"根据",account:"账户",accounting:"会计",accuracy:"精度",accurate:"准确的",accustomed:"习惯的",achieve:"实现",achievement:"成就",acid:"酸",acknowledge:"承认",acquire:"获取",acquisition:"获得",action:"行动",activate:"激活",active:"活跃的",activity:"活动",actual:"实际的",acuity:"敏锐",acute:"急性的",adapt:"适应",adaptation:"适应",addition:"添加",additional:"额外的",address:"地址",adequate:"足够的",adjust:"调整",adjustment:"调整",administer:"管理",administration:"管理",administrative:"行政的",admission:"许可",admit:"承认",adopt:"采用",adult:"成人",advance:"推进",advanced:"高级的",advantage:"优势",adverse:"不利的",advertise:"广告",advice:"建议",aerobic:"有氧的",aesthetic:"美学的",affect:"影响",affected:"受影响的",affiliate:"附属",affinity:"亲和力",afford:"负担得起",afterward:"后来",agency:"机构",agenda:"议程",agent:"代理人",aggregate:"总计",aggression:"侵略",aggressive:"侵略的",agility:"敏捷性",agreement:"协议",agriculture:"农业",aid:"援助",aim:"目标",airway:"气道",alert:"警觉",algebra:"代数",algorithm:"算法",align:"对齐",alignment:"对齐",alike:"相似的",alive:"活着的",alliance:"联盟",allocate:"分配",allow:"允许",allowance:"津贴",alongside:"在旁边",alter:"改变",alternate:"交替",alternative:"替代的",altogether:"总共",ambiguity:"歧义",ambiguous:"模糊的",ambition:"野心",amendment:"修正案",amino:"氨基酸",amongst:"在...之中",anabolic:"合成代谢的",anaerobic:"无氧的",analog:"模拟",analogous:"类似的",analogy:"类比",analyse:"分析",analysis:"分析",analytical:"分析的",analyze:"分析",anatomy:"解剖学",ancestor:"祖先",anchor:"锚",ancient:"古代的",anecdotal:"轶事的",anecdote:"轶事",angle:"角度",animate:"动画",ankle:"脚踝",annotate:"注释",announce:"宣布",annual:"年度的",anomaly:"异常",anonymous:"匿名的",antagonist:"拮抗剂",anterior:"前面的",antibiotic:"抗生素",anticipate:"预期",antioxidant:"抗氧化剂",anxiety:"焦虑",apparatus:"器械",apparent:"明显的",appeal:"呼吁",appearance:"外观",appendix:"附录",appetite:"食欲",application:"应用",apply:"应用",appoint:"任命",appreciate:"欣赏",approach:"方法",appropriate:"适当的",approval:"批准",approximate:"近似的",arbitrary:"任意的",architect:"建筑师",architecture:"建筑",archive:"档案",area:"区域",argue:"争论",arise:"出现",arithmetic:"算术",arrange:"安排",array:"数组",arrest:"逮捕",arrival:"到达",arrive:"到达",arterial:"动脉的",artery:"动脉",article:"文章",articulate:"发音",artificial:"人工的",ascending:"上升的",aspect:"方面",aspiration:"志向",assemble:"组装",assembly:"集会",assert:"断言",assess:"评估",assessment:"评估",asset:"资产",assign:"分配",assignment:"任务",assist:"协助",assistance:"援助",assistant:"助手",associate:"关联",association:"协会",assume:"假设",assumption:"假设",assurance:"保证",assure:"保证",asthma:"哮喘",asymptomatic:"无症状的",asymptotic:"渐近的",athlete:"运动员",athletic:"运动的",atmosphere:"大气",atomic:"原子的",attach:"附加",attachment:"附件",attain:"达到",attempt:"尝试",attend:"参加",attention:"注意",attitude:"态度",attribute:"属性",audience:"观众",audio:"音频",audit:"审计",author:"作者",authority:"权威",authorize:"授权",auto:"自动",automatic:"自动的",autonomy:"自治",auxiliary:"辅助的",availability:"可用性",available:"可用的",avenue:"大道",average:"平均",avoid:"避免",aware:"意识到的",awareness:"意识",axis:"轴",backup:"备份",bacteria:"细菌",balance:"平衡",bandwidth:"带宽",bankrupt:"破产",banner:"横幅",barrier:"障碍",base:"基础",baseline:"基线",basement:"地下室",basic:"基本的",basis:"基础",battery:"电池",bearing:"轴承",beginner:"初学者",behalf:"代表",behave:"表现",behavior:"行为",behaviour:"行为",belief:"信念",benchmark:"基准",beneficial:"有益的",benefit:"益处",bestow:"授予",beyond:"超越",bias:"偏见",bilateral:"双边的",binary:"二进制的",bind:"绑定",biochemical:"生物化学的",biochemistry:"生物化学",biomechanics:"生物力学",biopsy:"活检",bipolar:"双极的",birthday:"生日",blanket:"毯子",block:"块",bloodstream:"血流",bodily:"身体的",body:"身体",bond:"债券",bonus:"奖金",booklet:"小册子",boom:"繁荣",boost:"促进",border:"边界",boredom:"无聊",borrow:"借",bound:"界限",boundary:"边界",brainstorming:"头脑风暴",branch:"分支",breach:"违反",breadth:"广度",breakdown:"故障",breakthrough:"突破",breathing:"呼吸",brief:"简短的",briefing:"简报",brightness:"亮度",broadband:"宽带",brochure:"手册",bronchial:"支气管的",bronchus:"支气管",browse:"浏览",browser:"浏览器",brutal:"残酷的",buffer:"缓冲",build:"构建",builder:"建造者",building:"建筑",bulb:"灯泡",bulk:"批量",bulletin:"公告",burden:"负担",burnout:"倦怠",burst:"爆发",bypass:"旁路"};
+
+function getInlineTranslation(word){const w=word.toLowerCase();if(INLINE_DICT[w])return INLINE_DICT[w];return null}
+
+function lemmatize(w){const lw=w.toLowerCase();if(IRREGULAR[lw])return IRREGULAR[lw];if(lw==="versus")return"versus";if(lw.endsWith("ies")&&lw.length>4)return lw.slice(0,-3)+"y";if(lw.endsWith("ves"))return lw.slice(0,-3)+"f";if(lw.endsWith("s")&&!lw.endsWith("ss")&&lw.length>3&&!lw.endsWith("sis"))return lw.slice(0,-1);if(lw.endsWith("ied"))return lw.slice(0,-3)+"y";if(lw.endsWith("ed")&&lw.length>3){let s=lw.slice(0,-2);if(s.endsWith("i"))return s.slice(0,-1)+"y";if(s.endsWith("c"))return s+"e";return s}if(lw.endsWith("ing")&&lw.length>5){let s=lw.slice(0,-3);if(s.endsWith("y"))return s;if(s.length>2&&s.slice(-1)!=="e"&&/[aeiou]/.test(s.slice(-2,-1))&&/[^aeiou]/.test(s.slice(-1))&&s.length<=4)return s+"e";return s}return lw}
+
+// ============== 难度分级 ==============
+function getDifficulty(freq,word){const w=word.toLowerCase();const len=w.length;const isAcademic=AWL.has(w)||AWL.has(lemmatize(w));if(len>=12)return"hard";if(isAcademic&&len>=8)return"hard";if(isAcademic&&len>=5)return"medium";if(len<=4)return"easy";if(freq>=30&&len<=6)return"easy";if(freq>=8)return"medium";if(len>=10)return"hard";return"medium"}
+
+// ============== 艾宾浩斯间隔（分钟）==============
+const SRS_INTERVALS={again:1,hard:Math.round(24*60*0.5),good:24*60,easy:24*60*3}; // 1分钟,12小时,1天,3天
+function getNextInterval(card,quality){const now=Date.now();const iv=card.interval||0;const ef=card.easeFactor||2.5;let nInterval,nEF;if(quality==="again"){nInterval=SRS_INTERVALS.again;nEF=Math.max(1.3,ef-0.2)}else if(quality==="hard"){nInterval=Math.max(SRS_INTERVALS.hard,Math.round(iv*1.2));nEF=Math.max(1.3,ef-0.15)}else if(quality==="good"){nInterval=iv===0?SRS_INTERVALS.good:Math.round(iv*ef);nEF=ef}else{nInterval=iv===0?SRS_INTERVALS.easy:Math.round(iv*ef*1.3);nEF=ef+0.15}return{interval:nInterval,easeFactor:Math.max(1.3,nEF),due:now+nInterval*60*1000,reviewCount:(card.reviewCount||0)+1}}
+
+// ============== 应用主类 ==============
+class VocabApp{constructor(){this.words={};this.sentences=[];this.settings={dailyNew:10,dailyReview:30,autoSpeak:"off",showImage:"on",translateEngine:"libre"};this.studyQueue=[];this.reviewQueue=[];this.currentStudy=0;this.currentReview=0;this.filter="all";this.pdfText="";this.searchQuery="";this.selectedWords=new Set();this.studyLog=[];this.pdfSource="";this.loadData();this.initDragDrop();this.renderStats()}
+loadData(){const d=localStorage.getItem("vocabData");if(d){const o=JSON.parse(d);this.words=o.words||{};this.sentences=o.sentences||[];this.studyLog=o.studyLog||[];this.pdfSource=o.pdfSource||"";this.settings={...this.settings,...o.settings};document.getElementById("dailyNew").value=this.settings.dailyNew;document.getElementById("dailyReview").value=this.settings.dailyReview;document.getElementById("autoSpeak").value=this.settings.autoSpeak;document.getElementById("showImage").value=this.settings.showImage;if(document.getElementById("translateEngine"))document.getElementById("translateEngine").value=this.settings.translateEngine||"libre";this.renderStats()}else if(typeof PREBUILT_VOCAB!=="undefined"&&PREBUILT_VOCAB.words){this.words=PREBUILT_VOCAB.words||{};this.sentences=PREBUILT_VOCAB.sentences||[];this.studyLog=[];this.pdfSource=PREBUILT_VOCAB.pdfSource||"ACSM_test.pdf";this.settings={...this.settings,...PREBUILT_VOCAB.settings};document.getElementById("dailyNew").value=this.settings.dailyNew;document.getElementById("dailyReview").value=this.settings.dailyReview;document.getElementById("autoSpeak").value=this.settings.autoSpeak;document.getElementById("showImage").value=this.settings.showImage;this.saveData();this.showToast("已加载ACSΜ预置词库（"+Object.keys(this.words).length+"词）");this.renderStats()}}
+saveData(){localStorage.setItem("vocabData",JSON.stringify({words:this.words,sentences:this.sentences,settings:this.settings,studyLog:this.studyLog,pdfSource:this.pdfSource}))}
+showSection(id){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.getElementById("sec-"+id).classList.add("active");if(id==="words")this.renderWordList();if(id==="study")this.initStudy();if(id==="review")this.initReview();if(id==="settings"){this.renderLearningStats();this.renderStudyLog()}}
+initDragDrop(){const z=document.getElementById("uploadZone");["dragenter","dragover","dragleave","drop"].forEach(e=>{z.addEventListener(e,evt=>{evt.preventDefault();evt.stopPropagation()})});z.addEventListener("dragenter",()=>z.classList.add("dragover"));z.addEventListener("dragleave",()=>z.classList.remove("dragover"));z.addEventListener("drop",e=>{z.classList.remove("dragover");const f=e.dataTransfer.files[0];if(f&&f.name.endsWith(".pdf"))this.parsePDF(f)})}
+handleFile(e){const f=e.target.files[0];if(f)this.parsePDF(f)}
+
+async parsePDF(file){const st=document.getElementById("parseStatus");const txt=document.getElementById("parseText");st.style.display="block";txt.textContent="正在解析PDF...";try{pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;let full="";for(let i=1;i<=pdf.numPages;i++){txt.textContent=`解析第 ${i}/${pdf.numPages} 页...`;const page=await pdf.getPage(i);const txtCont=await page.getTextContent();full+=txtCont.items.map(x=>x.str).join(" ")+"\n"}this.pdfText=full;this.pdfSource=file.name;this.extractWords(full,file.name);this.extractSentences(full);this.saveData();this.showToast(`已提取 ${Object.keys(this.words).length} 个生词`);this.renderStats();this.renderWordList();}catch(err){console.error(err);this.showToast("解析失败: "+err.message)}finally{st.style.display="none"}}
+
+extractWords(text,source=""){const words=text.match(/\b[a-zA-Z]{2,}\b/g)||[];const freq={};words.forEach(w=>{const lw=w.toLowerCase();if(STOP_WORDS.has(lw)||STOP_WORDS.has(lemmatize(lw)))return;if(ABBREVS.has(lw)||ABBREVS.has(lemmatize(lw)))return;const base=lemmatize(lw);freq[base]=(freq[base]||0)+1});const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,300);sorted.forEach(([w,f])=>{if(!this.words[w]){this.words[w]={word:w,freq:f,diff:getDifficulty(f,w),status:"new",created:Date.now(),translations:[],example:"",interval:0,easeFactor:2.5,due:0,reviewCount:0,pdfSource:source}}})}
+
+extractSentences(text){this.sentences=text.replace(/([.!?])\s+/g,"$1|").split("|").map(s=>s.trim()).filter(s=>s.length>20&&s.length<400&&!/https?:\/\/|www\./.test(s)&&!/\u4e00-\u9fa5/.test(s)).map(s=>({en:s,zh:""}));this.saveData()}
+findSentences(word){const base=lemmatize(word);const variants=[word,base];if(base!==word){const suffixes=["s","es","ed","ing","tion","ation","er","or","ment","ness","ly","ive","al","ic","ous"];suffixes.forEach(sfx=>{variants.push(base+sfx);if(base.endsWith("e")&&sfx.startsWith("i"))variants.push(base.slice(0,-1)+sfx)});if(base.endsWith("y"))variants.push(base.slice(0,-1)+"ies")}return this.sentences.filter(s=>{const txt=s.en||s;for(const v of variants){if(new RegExp(`\\b${v}\\b`,'i').test(txt))return true}return false}).slice(0,3)}
+
+async translateWord(word){const w=this.words[word];if(w.translations.length>0&&w.translations[0]!=="翻译加载中..."&&w.translations[0]!=="翻译失败，请联网")return w.translations;const inline=getInlineTranslation(word);if(inline){w.translations=[inline];this.saveData();return w.translations}try{let transText=await this.tryTranslate(word);if(transText){w.translations=[transText]}else{w.translations=["翻译加载中..."]}}catch(e){w.translations=["翻译失败，请联网"]}
+this.saveData();return w.translations}
+
+async fetchWithTimeout(url,options={},timeout=5000){return Promise.race([fetch(url,options),new Promise((_,reject)=>setTimeout(()=>reject(new Error("timeout")),timeout))])}
+
+async tryTranslate(text){let result="";try{const r=await this.fetchWithTimeout(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|zh`,{},10000);const d=await r.json();if(d.responseData&&d.responseData.translatedText&&d.responseData.translatedText!=="MYMEMORY WARNING")result=d.responseData.translatedText}catch(e){}if(!result){const engines=["https://libretranslate.de","https://libretranslate.com","https://translate.terraprint.co"];const engine=this.settings.translateEngine||"libre";if(engine==="libre"){for(const base of engines){try{const r=await this.fetchWithTimeout(`${base}/translate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({q:text,source:"en",target:"zh",format:"text"})},10000);const d=await r.json();if(d.translatedText){result=d.translatedText;break}}catch(e){}}}}return result}
+
+async translateSentence(sentence){if(!sentence)return"";const cached=this.sentences.find(s=>(s.en||s)===sentence);if(cached&&cached.zh)return cached.zh;const trans=await this.tryTranslate(sentence);if(cached)cached.zh=trans;return trans||""}
+
+renderStats(){const keys=Object.keys(this.words);const total=keys.length;const mastered=keys.filter(k=>this.words[k].status==="mastered").length;const learning=keys.filter(k=>this.words[k].status==="learning").length;const todayLearned=keys.filter(k=>{const w=this.words[k];return w.lastStudy&&Date.now()-w.lastStudy<86400000}).length;document.getElementById("uploadStats").innerHTML=[{n:total,l:"总词数"},{n:learning,l:"学习中"},{n:mastered,l:"已掌握"},{n:todayLearned,l:"今日已学"}].map(s=>`<div class="stat-box"><div class="num">${s.n}</div><div class="label">${s.l}</div></div>`).join("")}
+
+renderWordList(){const box=document.getElementById("wordList");let items=Object.values(this.words);if(this.searchQuery){items=items.filter(w=>w.word.toLowerCase().includes(this.searchQuery.toLowerCase()))}if(this.filter==="new")items=items.filter(w=>w.status==="new");if(this.filter==="learning")items=items.filter(w=>w.status==="learning");if(this.filter==="mastered")items=items.filter(w=>w.status==="mastered");items.sort((a,b)=>b.freq-a.freq);const batchBar=document.getElementById("batchToolbar");if(this.selectedWords.size>0){batchBar.classList.add("show");document.getElementById("batchCount").textContent=`已选 ${this.selectedWords.size} 个`}else{batchBar.classList.remove("show")}box.innerHTML=items.length===0?"<div class='empty-state'>暂无单词</div>":items.map(w=>{
+const diffClass=w.diff==="easy"?"easy":w.diff==="hard"?"hard":"medium";const statusTag=w.status==="mastered"?"<span class='tag'>已掌握</span>":w.status==="learning"?"<span class='tag'>学习中</span>":"<span class='tag'>未学</span>";const isSel=this.selectedWords.has(w.word);const nxtRev=w.due?new Date(w.due).toLocaleDateString("zh-CN"):"未安排";const srcTag=w.pdfSource?`<span class="source-tag">${w.pdfSource.slice(0,20)}</span>`:"";return`<div class="word-item" onclick="app.showWordDetail('${w.word}')">
+<input type="checkbox" class="chk" ${isSel?"checked":""} onclick="event.stopPropagation();app.toggleSelect('${w.word}')">
+<div><span class="w">${w.word}</span> ${statusTag}${srcTag}<div style="margin-top:4px;font-size:.8rem;color:var(--muted)">${w.translations[0]||""}</div><div style="margin-top:2px;font-size:.75rem;color:var(--muted)">下次复习: ${nxtRev}</div></div>
+<div style="text-align:right"><div class="freq">出现${w.freq}次</div><div class="diff" style="margin-top:4px"><span class="badge ${diffClass}">${w.diff}</span></div></div>
+</div>`}).join("");document.getElementById("wordStats").innerHTML=[{n:items.filter(x=>x.status==="new").length,l:"未学"},{n:items.filter(x=>x.status==="learning").length,l:"学习中"},{n:items.filter(x=>x.status==="mastered").length,l:"已掌握"}].map(s=>`<div class="stat-box"><div class="num">${s.n}</div><div class="label">${s.l}</div></div>`).join("")}
+filterWords(f){this.filter=f;document.querySelectorAll("#sec-words .filter-bar .btn").forEach(b=>b.classList.remove("active"));event.target.classList.add("active");this.renderWordList()}
+
+async initStudy(){const newWords=Object.values(this.words).filter(w=>w.status==="new").slice(0,this.settings.dailyNew);if(newWords.length===0){document.getElementById("studyEmpty").style.display="block";document.getElementById("studyCardArea").style.display="none";return}this.studyQueue=newWords;this.currentStudy=0;document.getElementById("studyEmpty").style.display="none";document.getElementById("studyCardArea").style.display="block";await this.renderStudyCard()}
+async renderStudyCard(){const w=this.studyQueue[this.currentStudy];if(!w)return;const card=document.getElementById("flashcard");card.classList.remove("flipped");document.getElementById("cardWord").textContent=w.word;document.getElementById("cardWordBack").textContent=w.word;document.getElementById("cardPhonetic").textContent="";const trans=await this.translateWord(w.word);document.getElementById("cardMeaning").textContent=trans.join("; ");const sens=this.findSentences(w.word);if(sens.length>0){const s=sens[0];if(!s.zh)s.zh=await this.translateSentence(s.en||s);document.getElementById("cardExample").innerHTML=`<div style="margin-bottom:6px">${s.en||s}</div><div style="color:var(--muted);font-size:.85rem">${s.zh||"翻译中..."}</div>`}else{document.getElementById("cardExample").textContent="暂无例句"}document.getElementById("cardDiff").innerHTML=`<span class="badge ${w.diff}">${w.diff}</span>`;const img=document.getElementById("cardImg");if(this.settings.showImage==="on"){img.src=`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(w.word)}&prop=pageimages&format=json&pithumbsize=300&origin=*`;img.style.display="block";img.crossOrigin="anonymous";this.loadWikiImage(img,w.word)}else{img.style.display="none"}document.getElementById("cardCounter").textContent=`${this.currentStudy+1}/${this.studyQueue.length}`;const pct=((this.currentStudy)/this.studyQueue.length)*100;document.getElementById("studyProgress").style.width=pct+"%";if(this.settings.autoSpeak==="front"||this.settings.autoSpeak==="both")setTimeout(()=>this.speak(),400)}
+flipCard(){document.getElementById("flashcard").classList.toggle("flipped");if(this.settings.autoSpeak==="back"||this.settings.autoSpeak==="both")setTimeout(()=>this.speak(),400)}
+async speak(){const w=this.studyQueue[this.currentStudy];if(!w)return;if(window.speechSynthesis){window.speechSynthesis.cancel();await new Promise(r=>setTimeout(r,50));const u=new SpeechSynthesisUtterance(w.word);u.lang="en-US";u.rate=.9;try{const voices=window.speechSynthesis.getVoices();const enVoice=voices.find(v=>v.lang.startsWith("en"));if(enVoice)u.voice=enVoice}catch(e){}window.speechSynthesis.speak(u)}else{try{await this.playAudio(w.word)}catch(e){this.showToast("语音播放失败，请检查网络")}}}
+prevCard(){if(this.currentStudy>0){this.currentStudy--;this.renderStudyCard()}}
+nextCard(){if(this.currentStudy<this.studyQueue.length-1){this.currentStudy++;this.renderStudyCard()}}
+
+async markCard(q){const w=this.studyQueue[this.currentStudy];if(!w)return;w.lastStudy=Date.now();this.studyLog.push({word:w.word,action:"new",quality:q,timestamp:Date.now()});const qMap={again:0,hard:1,good:2,easy:3};const qScore=qMap[q]||1;if(q==="easy"){w.status="mastered";this.studyLog.push({word:w.word,action:"mastered",qualityScore:3,timestamp:Date.now()});this.showToast("标记为已掌握")}else if(q==="good"){w.status="learning";const sched=getNextInterval(w,"good");Object.assign(w,sched);this.studyLog.push({word:w.word,action:"review",quality:q,qualityScore:2,timestamp:Date.now()});this.showToast("记住了，明天复习")}else if(q==="hard"){w.status="learning";const sched=getNextInterval(w,"hard");Object.assign(w,sched);this.studyLog.push({word:w.word,action:"review",quality:q,qualityScore:1,timestamp:Date.now()});this.showToast("已安排短时间复习")}else{this.studyLog.push({word:w.word,action:"review",quality:q,qualityScore:0,timestamp:Date.now()});this.showToast("再学一次")}this.saveData();if(this.currentStudy<this.studyQueue.length-1){this.currentStudy++;await this.renderStudyCard()}else{document.getElementById("studyEmpty").style.display="block";document.getElementById("studyCardArea").style.display="none";this.showToast("今日新词学习完成！")}}
+
+initReview(){const now=Date.now();this.reviewQueue=Object.values(this.words).filter(w=>w.status==="learning"&&w.due&&w.due<=now).slice(0,this.settings.dailyReview);if(this.reviewQueue.length===0){document.getElementById("reviewEmpty").style.display="block";document.getElementById("reviewArea").style.display="none";return}this.currentReview=0;document.getElementById("reviewEmpty").style.display="none";document.getElementById("reviewArea").style.display="block";this.renderReviewCard()}
+async renderReviewCard(){const w=this.reviewQueue[this.currentReview];if(!w)return;document.getElementById("reviewCard").classList.remove("flipped");document.getElementById("reviewWord").textContent=w.word;document.getElementById("reviewWordBack").textContent=w.word;const trans=await this.translateWord(w.word);document.getElementById("reviewMeaning").textContent=trans.join("; ");const sens=this.findSentences(w.word);if(sens.length>0){const s=sens[0];if(!s.zh)s.zh=await this.translateSentence(s.en||s);document.getElementById("reviewExample").innerHTML=`<div style="margin-bottom:6px">${s.en||s}</div><div style="color:var(--muted);font-size:.85rem">${s.zh||"翻译中..."}</div>`}else{document.getElementById("reviewExample").textContent="暂无例句"}const dueDate=w.due?new Date(w.due).toLocaleDateString("zh-CN"):"";document.getElementById("reviewDue").textContent=dueDate?`预定复习: ${dueDate}`:"";const img=document.getElementById("reviewImg");if(this.settings.showImage==="on"){img.src=`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(w.word)}&prop=pageimages&format=json&pithumbsize=300&origin=*`;img.style.display="block";img.crossOrigin="anonymous";this.loadWikiImage(img,w.word)}else{img.style.display="none"}document.getElementById("reviewCounter").textContent=`${this.currentReview+1}/${this.reviewQueue.length}`}
+flipReviewCard(){document.getElementById("reviewCard").classList.toggle("flipped")}
+speakReview(){const w=this.reviewQueue[this.currentReview];if(!w)return;if(window.speechSynthesis){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(w.word);u.lang="en-US";u.rate=.9;try{const voices=window.speechSynthesis.getVoices();const enVoice=voices.find(v=>v.lang.startsWith("en"));if(enVoice)u.voice=enVoice}catch(e){}window.speechSynthesis.speak(u)}else{this.playAudio(w.word).catch(()=>this.showToast("语音播放失败"))}}
+prevReview(){if(this.currentReview>0){this.currentReview--;this.renderReviewCard()}}
+nextReview(){if(this.currentReview<this.reviewQueue.length-1){this.currentReview++;this.renderReviewCard()}}
+rateReview(q){const w=this.reviewQueue[this.currentReview];if(!w)return;const sched=getNextInterval(w,q);Object.assign(w,sched);const qMap={again:0,hard:1,good:2,easy:3};const qScore=qMap[q]||1;this.studyLog.push({word:w.word,action:"review",quality:q,qualityScore:qScore,timestamp:Date.now()});if(q==="again")w.status="learning";if(q==="easy"&&w.reviewCount>=3){w.status="mastered";this.studyLog.push({word:w.word,action:"mastered",qualityScore:3,timestamp:Date.now()})}w.lastStudy=Date.now();this.saveData();if(this.currentReview<this.reviewQueue.length-1){this.currentReview++;this.renderReviewCard()}else{document.getElementById("reviewEmpty").style.display="block";document.getElementById("reviewArea").style.display="none";this.showToast("今日复习完成！")}}
+
+showWordDetail(word){const w=this.words[word];if(!w)return;const history=this.studyLog.filter(l=>l.word===word).sort((a,b)=>b.timestamp-a.timestamp);const reviewHistory=history.filter(l=>l.action==="review").slice(0,10).reverse();const chartBars=reviewHistory.map((h,i)=>{const h_pct=Math.min(100,((h.qualityScore||2)/4)*100);return`<div style="flex:1;text-align:center"><div style="height:${h_pct}%;background:linear-gradient(to top,var(--accent),var(--accent2));border-radius:4px 4px 0 0;min-height:4px"></div><div style="font-size:.65rem;color:var(--muted);margin-top:4px">${i+1}</div></div>`;}).join("");const reviewCount=w.reviewCount||0;const currentInterval=w.interval||0;const daysInterval=Math.round(currentInterval/(24*60));const body=`<div style="text-align:center;margin-bottom:16px"><div style="font-size:2rem;font-weight:700">${w.word}</div><div style="color:var(--muted);margin-top:8px">${w.translations[0]||"翻译加载中..."}</div></div><div class="detail-meta"><div class="item"><div>词频</div><div class="val">${w.freq}次</div></div><div class="item"><div>难度</div><div class="val"><span class="badge ${w.diff}">${w.diff}</span></div></div><div class="item"><div>来源</div><div class="val">${w.pdfSource||"未知"}</div></div><div class="item"><div>状态</div><div class="val">${w.status==="mastered"?"已掌握":w.status==="learning"?"学习中":"未学"}</div></div><div class="item"><div>复习次数</div><div class="val">${reviewCount}</div></div><div class="item"><div>下次复习</div><div class="val">${w.due?new Date(w.due).toLocaleDateString("zh-CN"):"未安排"}</div></div><div class="item"><div>当前间隔</div><div class="val">${daysInterval}天</div></div><div class="item"><div>熟练度</div><div class="val">${Math.round((w.easeFactor||2.5)*10)/10}</div></div></div><h4 style="margin-top:16px;font-size:.9rem;color:var(--accent)">记忆曲线</h4><div class="memory-chart">${chartBars||'<div style="color:var(--muted);text-align:center;width:100%">暂无复习记录</div>'}</div><h4 style="margin-top:16px;font-size:.9rem;color:var(--accent)">学习历史</h4><div class="timeline">${history.length===0?'<div style="color:var(--muted);padding:8px 0">暂无学习记录</div>':history.slice(0,20).map(h=>`<div class="timeline-item"><div>${h.action==="review"?"复习":h.action==="mastered"?"已掌握":h.action==="new"?"新学":h.action} ${h.quality?"("+h.quality+")":""}</div><div class="time">${new Date(h.timestamp).toLocaleString("zh-CN")}</div></div>`).join("")}</div><h4 style="margin-top:16px;font-size:.9rem;color:var(--accent)">原文例句</h4><div>${this.findSentences(word).map(s=>{const sen=s.en||s;const zh=s.zh;const zhHtml=zh?`<div style="color:var(--muted);font-size:.85rem;margin-top:4px">${zh}</div>`:"";return`<div class="sentence-item"><div>${sen.replace(new RegExp(`\b(${word})\b`,'gi'),'<span class="highlight">$1</span>')}</div>${zhHtml}</div>`}).join("")||'<div style="color:var(--muted)">暂无例句</div>'}</div><div style="margin-top:16px;display:flex;gap:8px;justify-content:center"><button class="btn" onclick="app.speakWord('${word}')">🔊 发音</button><button class="btn danger" onclick="app.deleteWord('${word}')">🗑️ 删除</button><button class="btn primary" onclick="app.quickReview('${word}')">🔄 立即复习</button></div>`;document.getElementById("detailTitle").textContent=w.word;document.getElementById("detailBody").innerHTML=body;document.getElementById("wordDetailModal").classList.add("show")}
+saveSettings(){this.settings.dailyNew=parseInt(document.getElementById("dailyNew").value)||10;this.settings.dailyReview=parseInt(document.getElementById("dailyReview").value)||30;this.settings.autoSpeak=document.getElementById("autoSpeak").value;this.settings.showImage=document.getElementById("showImage").value;this.settings.translateEngine=(document.getElementById("translateEngine")&&document.getElementById("translateEngine").value)||"libre";this.saveData();this.showToast("设置已保存")}
+renderLearningStats(){const keys=Object.keys(this.words);const total=keys.length;const mastered=keys.filter(k=>this.words[k].status==="mastered").length;const learning=keys.filter(k=>this.words[k].status==="learning").length;const neww=keys.filter(k=>this.words[k].status==="new").length;const todayReviewed=keys.filter(k=>{const w=this.words[k];return w.lastStudy&&Date.now()-w.lastStudy<86400000&&w.status==="learning"}).length;document.getElementById("learningStats").innerHTML=[{n:total,l:"总词数"},{n:neww,l:"未学"},{n:learning,l:"学习中"},{n:mastered,l:"已掌握"},{n:todayReviewed,l:"今日复习"}].map(s=>`<div class="stat-box"><div class="num">${s.n}</div><div class="label">${s.l}</div></div>`).join("")}
+
+loadPrebuilt(){if(!confirm("加载预置词库会覆盖当前数据，确定吗？"))return;if(typeof PREBUILT_VOCAB!=="undefined"&&PREBUILT_VOCAB.words){this.words=PREBUILT_VOCAB.words||{};this.sentences=PREBUILT_VOCAB.sentences||[];this.studyLog=[];this.pdfSource=PREBUILT_VOCAB.pdfSource||"ACSM_test.pdf";this.settings={...this.settings,...PREBUILT_VOCAB.settings};this.saveData();this.showToast("已加载ACSΜ预置词库（"+Object.keys(this.words).length+"词）");this.renderStats();this.renderWordList()}else{this.showToast("预置词库不可用")}}clearAll(){if(!confirm("确定要清空所有数据吗？此操作不可恢复。"))return;this.words={};this.sentences=[];this.studyLog=[];this.pdfSource="";this.selectedWords.clear();this.saveData();this.showToast("数据已清空");this.renderStats()}
+exportData(){const blob=new Blob([JSON.stringify({words:this.words,sentences:this.sentences,settings:this.settings,studyLog:this.studyLog,pdfSource:this.pdfSource},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="vocab-backup-"+new Date().toISOString().slice(0,10)+".json";a.click()}
+importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const o=JSON.parse(ev.target.result);if(o.words)this.words=o.words;if(o.sentences)this.sentences=o.sentences;if(o.settings)this.settings={...this.settings,...o.settings};if(o.studyLog)this.studyLog=o.studyLog||[];if(o.pdfSource)this.pdfSource=o.pdfSource||"";this.saveData();this.showToast(`导入成功，共 ${Object.keys(this.words).length} 个单词`);this.renderStats()}catch(err){this.showToast("导入失败: "+err.message)}};r.readAsText(f)}
+searchWords(q){this.searchQuery=q;this.renderWordList()}
+clearSearch(){this.searchQuery="";document.getElementById("wordSearch").value="";this.renderWordList()}
+toggleSelect(word){if(this.selectedWords.has(word))this.selectedWords.delete(word);else this.selectedWords.add(word);this.renderWordList()}
+clearSelection(){this.selectedWords.clear();this.renderWordList()}
+batchDelete(){if(!confirm(`确定删除选中的 ${this.selectedWords.size} 个单词吗？`))return;const count=this.selectedWords.size;this.selectedWords.forEach(w=>{delete this.words[w]});this.selectedWords.clear();this.saveData();this.renderWordList();this.showToast(`已删除 ${count} 个单词`)}
+batchMarkMastered(){this.selectedWords.forEach(w=>{if(this.words[w])this.words[w].status="mastered"});this.selectedWords.clear();this.saveData();this.renderWordList();this.showToast("已标记为已掌握")}
+batchMarkLearning(){this.selectedWords.forEach(w=>{if(this.words[w])this.words[w].status="learning"});this.selectedWords.clear();this.saveData();this.renderWordList();this.showToast("已标记为学习中")}
+playAudio(word){return new Promise((resolve,reject)=>{const audio=new Audio(`https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=2`);audio.oncanplaythrough=()=>resolve(audio);audio.onerror=(e)=>reject(e);audio.play().catch(e=>reject(e));})}
+speakWord(word){if(window.speechSynthesis){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(word);u.lang="en-US";u.rate=.9;try{const voices=window.speechSynthesis.getVoices();const enVoice=voices.find(v=>v.lang.startsWith("en"));if(enVoice)u.voice=enVoice}catch(e){}window.speechSynthesis.speak(u)}else{this.playAudio(word).catch(()=>this.showToast("语音播放失败，请检查网络"))}}
+deleteWord(word){if(!confirm(`确定删除单词 "${word}" 吗？`))return;delete this.words[word];this.selectedWords.delete(word);this.saveData();document.getElementById("wordDetailModal").classList.remove("show");this.renderWordList();this.showToast("已删除")}
+quickReview(word){document.getElementById("wordDetailModal").classList.remove("show");const w=this.words[word];if(!w)return;if(w.status==="mastered"){w.status="learning";this.showToast("已重置为学习中")}this.showSection("review");this.initReview()}
+renderStudyLog(){const card=document.getElementById("studyLogCard");const list=document.getElementById("studyLogList");if(this.studyLog.length===0){card.style.display="none";return}card.style.display="block";const byDate={};this.studyLog.slice().reverse().forEach(l=>{const date=new Date(l.timestamp).toLocaleDateString("zh-CN");if(!byDate[date])byDate[date]=[];byDate[date].push(l)});list.innerHTML=Object.entries(byDate).slice(0,7).map(([date,logs])=>`<div style="margin-bottom:12px"><div style="font-weight:600;color:var(--accent);font-size:.9rem;margin-bottom:6px">${date}</div>${logs.slice(0,10).map(l=>`<div class="study-log-item"><span>${l.word}</span><span style="color:var(--muted)">${l.action==="review"?"复习":l.action==="mastered"?"已掌握":l.action==="new"?"新学":l.action} ${l.quality?"("+l.quality+")":""}</span></div>`).join("")}${logs.length>10?`<div style="color:var(--muted);font-size:.75rem;text-align:center">+${logs.length-10} 条...</div>`:""}</div>`).join("")}
+async loadWikiImage(img,word){try{const r=await this.fetchWithTimeout(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(word)}&prop=pageimages&format=json&pithumbsize=300&origin=*`,{},4000);const d=await r.json();const pages=d.query.pages;const page=Object.values(pages)[0];if(page&&page.thumbnail&&page.thumbnail.source){img.src=page.thumbnail.source;img.style.display="block"}else{img.style.display="none"}}catch(e){img.style.display="none"}}showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2500)}}
+
+const app=new VocabApp();
+
+</script>
+</body>
+</html>

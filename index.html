@@ -291,6 +291,10 @@ input[type=number],select{background:var(--bg);border:1px solid var(--border);co
 <option value="mymemory">MyMemory（备用）</option>
 </select>
 </div>
+<div class="setting-item">
+<label>PDF提取词数</label>
+<input type="number" id="extractCount" value="300" min="50" max="2000" step="50" onchange="app.saveSettings()">
+</div>
 </div>
 <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
 <button class="btn danger" onclick="app.clearAll()">🗑️ 清空所有数据</button>
@@ -408,7 +412,7 @@ renderLearningStats(){const keys=Object.keys(this.words);const total=keys.length
 
 loadPrebuilt(){if(!confirm("加载预置词库会覆盖当前数据，确定吗？"))return;if(typeof PREBUILT_VOCAB!=="undefined"&&PREBUILT_VOCAB.words){this.words=PREBUILT_VOCAB.words||{};this.sentences=PREBUILT_VOCAB.sentences||[];this.studyLog=[];this.pdfSource=PREBUILT_VOCAB.pdfSource||"ACSM_test.pdf";this.settings={...this.settings,...PREBUILT_VOCAB.settings};this.saveData();this.showToast("已加载ACSΜ预置词库（"+Object.keys(this.words).length+"词）");this.renderStats();this.renderWordList()}else{this.showToast("预置词库不可用")}}clearAll(){if(!confirm("确定要清空所有数据吗？此操作不可恢复。"))return;this.words={};this.sentences=[];this.studyLog=[];this.pdfSource="";this.selectedWords.clear();this.saveData();this.showToast("数据已清空");this.renderStats()}
 exportData(){const blob=new Blob([JSON.stringify({words:this.words,sentences:this.sentences,settings:this.settings,studyLog:this.studyLog,pdfSource:this.pdfSource},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="vocab-backup-"+new Date().toISOString().slice(0,10)+".json";a.click()}
-importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const o=JSON.parse(ev.target.result);if(o.words)this.words=o.words;if(o.sentences)this.sentences=o.sentences;if(o.settings)this.settings={...this.settings,...o.settings};if(o.studyLog)this.studyLog=o.studyLog||[];if(o.pdfSource)this.pdfSource=o.pdfSource||"";this.saveData();this.showToast(`导入成功，共 ${Object.keys(this.words).length} 个单词`);this.renderStats()}catch(err){this.showToast("导入失败: "+err.message)}};r.readAsText(f)}
+importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const o=JSON.parse(ev.target.result);if(o.words)this.words=o.words;if(o.sentences)this.sentences=o.sentences;if(o.settings)this.settings={...this.settings,...o.settings};if(document.getElementById("extractCount"))document.getElementById("extractCount").value=this.settings.extractCount||300;if(o.studyLog)this.studyLog=o.studyLog||[];if(o.pdfSource)this.pdfSource=o.pdfSource||"";this.saveData();this.showToast(`导入成功，共 ${Object.keys(this.words).length} 个单词`);this.renderStats()}catch(err){this.showToast("导入失败: "+err.message)}};r.readAsText(f)}
 searchWords(q){this.searchQuery=q;this.renderWordList()}
 clearSearch(){this.searchQuery="";document.getElementById("wordSearch").value="";this.renderWordList()}
 toggleSelect(word){if(this.selectedWords.has(word))this.selectedWords.delete(word);else this.selectedWords.add(word);this.renderWordList()}
@@ -422,6 +426,12 @@ deleteWord(word){if(!confirm(`确定删除单词 "${word}" 吗？`))return;delet
 quickReview(word){document.getElementById("wordDetailModal").classList.remove("show");const w=this.words[word];if(!w)return;if(w.status==="mastered"){w.status="learning";this.showToast("已重置为学习中")}this.showSection("review");this.initReview()}
 renderStudyLog(){const card=document.getElementById("studyLogCard");const list=document.getElementById("studyLogList");if(this.studyLog.length===0){card.style.display="none";return}card.style.display="block";const byDate={};this.studyLog.slice().reverse().forEach(l=>{const date=new Date(l.timestamp).toLocaleDateString("zh-CN");if(!byDate[date])byDate[date]=[];byDate[date].push(l)});list.innerHTML=Object.entries(byDate).slice(0,7).map(([date,logs])=>`<div style="margin-bottom:12px"><div style="font-weight:600;color:var(--accent);font-size:.9rem;margin-bottom:6px">${date}</div>${logs.slice(0,10).map(l=>`<div class="study-log-item"><span>${l.word}</span><span style="color:var(--muted)">${l.action==="review"?"复习":l.action==="mastered"?"已掌握":l.action==="new"?"新学":l.action} ${l.quality?"("+l.quality+")":""}</span></div>`).join("")}${logs.length>10?`<div style="color:var(--muted);font-size:.75rem;text-align:center">+${logs.length-10} 条...</div>`:""}</div>`).join("")}
 async loadWikiImage(img,word){try{const r=await this.fetchWithTimeout(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(word)}&prop=pageimages&format=json&pithumbsize=300&origin=*`,{},4000);const d=await r.json();const pages=d.query.pages;const page=Object.values(pages)[0];if(page&&page.thumbnail&&page.thumbnail.source){img.src=page.thumbnail.source;img.style.display="block"}else{img.style.display="none"}}catch(e){img.style.display="none"}}showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2500)}}
+
+const app=new VocabApp();
+
+</script>
+</body>
+</html>w"),2500)}}
 
 const app=new VocabApp();
 

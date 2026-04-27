@@ -139,6 +139,13 @@ input[type=number],select{background:var(--bg);border:1px solid var(--border);co
 <div id="parseStatus" style="margin-top:12px;display:none">
 <span class="loading"></span> <span id="parseText">正在解析...</span>
 </div>
+<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+<h3 style="font-size:1rem;margin-bottom:8px;color:var(--accent)">🌐 粘贴网页/文本内容</h3>
+<textarea id="textInput" placeholder="直接粘贴网页文字、文章段落或HTML代码..." style="width:100%;min-height:120px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:.9rem;resize:vertical"></textarea>
+<div style="margin-top:8px;text-align:center">
+<button class="btn primary" onclick="app.extractFromText()">🔍 提取生词</button>
+</div>
+</div>
 </div>
 <div class="stats" id="uploadStats"></div>
 </div>
@@ -364,6 +371,7 @@ showSection(id){document.querySelectorAll(".section").forEach(s=>s.classList.rem
 initDragDrop(){const z=document.getElementById("uploadZone");["dragenter","dragover","dragleave","drop"].forEach(e=>{z.addEventListener(e,evt=>{evt.preventDefault();evt.stopPropagation()})});z.addEventListener("dragenter",()=>z.classList.add("dragover"));z.addEventListener("dragleave",()=>z.classList.remove("dragover"));z.addEventListener("drop",e=>{z.classList.remove("dragover");const f=e.dataTransfer.files[0];if(f&&f.name.endsWith(".pdf"))this.parsePDF(f)})}
 handleFile(e){const f=e.target.files[0];if(f)this.parsePDF(f)}
 
+extractFromText(){const text=document.getElementById("textInput").value.trim();if(!text){this.showToast("请先粘贴内容");return}this.pdfSource="粘贴文本";this.pdfText=text;this.extractWords(text,"粘贴文本");this.extractSentences(text);this.saveData();this.showToast(`已提取 ${Object.keys(this.words).length} 个生词`);this.renderStats();this.renderWordList();document.getElementById("textInput").value=""}
 async parsePDF(file){const st=document.getElementById("parseStatus");const txt=document.getElementById("parseText");st.style.display="block";txt.textContent="正在解析PDF...";try{pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;let full="";for(let i=1;i<=pdf.numPages;i++){txt.textContent=`解析第 ${i}/${pdf.numPages} 页...`;const page=await pdf.getPage(i);const txtCont=await page.getTextContent();full+=txtCont.items.map(x=>x.str).join(" ")+"\n"}this.pdfText=full;this.pdfSource=file.name;this.extractWords(full,file.name);this.extractSentences(full);this.saveData();this.showToast(`已提取 ${Object.keys(this.words).length} 个生词`);this.renderStats();this.renderWordList();}catch(err){console.error(err);this.showToast("解析失败: "+err.message)}finally{st.style.display="none"}}
 
 extractWords(text,source=""){const words=text.match(/\b[a-zA-Z]{2,}\b/g)||[];const freq={};words.forEach(w=>{const lw=w.toLowerCase();if(STOP_WORDS.has(lw)||STOP_WORDS.has(lemmatize(lw)))return;if(ABBREVS.has(lw)||ABBREVS.has(lemmatize(lw)))return;const base=lemmatize(lw);freq[base]=(freq[base]||0)+1});const limit=this.settings.extractCount||300;const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,limit);sorted.forEach(([w,f])=>{if(!this.words[w]){this.words[w]={word:w,freq:f,diff:getDifficulty(f,w),status:"new",created:Date.now(),translations:[],example:"",interval:0,easeFactor:2.5,due:0,reviewCount:0,pdfSource:source}}})}

@@ -25529,4 +25529,4 @@ const PREBUILT_VOCAB={
   },
   "studyLog": [],
   "pdfSource": "ACSM_Guidelines_11th_PositionStand_v8"
-}
+};
